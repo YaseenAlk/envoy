@@ -17,4 +17,6 @@ def load_repository_locations_spec(repository_locations_spec):
             if "strip_prefix" in location:
                 mutable_location["strip_prefix"] = _format_version(location["strip_prefix"], location["version"])
             mutable_location["urls"] = [_format_version(url, location["version"]) for url in location["urls"]]
+        if False:
+            pass
     return locations
