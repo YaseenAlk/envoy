@@ -16,7 +16,8 @@ class ProtolockTests(unittest.TestCase):
         self.temp_dir.cleanup()
     
     def run_protolock_test(self, testtype, testname, additional_args=None, expect_no_changes=False):
-        # surely there's a much better/safer way to do this
+        # there's probably a better/safer way to navigate
+        # but it seems like check_spelling_pedantic_test.py takes this approach as well
         tests_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "testdata", "api_protolock", testtype)
         protolock_args = DEFAULT_PROTOLOCK_ARGS + [f"--protoroot={self.temp_dir.name}", f"--lockdir={self.temp_dir.name}"]
         if additional_args is not None:

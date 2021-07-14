@@ -49,7 +49,6 @@ def api_dependencies():
     )
     external_http_archive(
         "com_github_nilslice_protolock",
-        build_file_content = BUILD_ALL_CONTENT,
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
