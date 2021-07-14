@@ -1036,3 +1036,6 @@ def _is_linux_s390x(ctxt):
 
 def _is_linux_x86_64(ctxt):
     return _is_linux(ctxt) and _is_arch(ctxt, "x86_64")
+
+def test():
+    pass
