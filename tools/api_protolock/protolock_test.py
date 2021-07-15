@@ -14,7 +14,6 @@ class ProtolockTests(unittest.TestCase):
     def setUp(self):
         # create a temporary directory to house the proto.lock file and current proto file
         self.temp_dir = tempfile.TemporaryDirectory()
-        #/usr/local/google/home/yaseena/envoy_fork/bazel-bin/tools/api_protolock/protolock_test.runfiles/com_github_nilslice_protolock/protolock_/protolock
         self.protolock_path = runfiles.Create().Rlocation(
             "com_github_nilslice_protolock/protolock_/protolock")
 

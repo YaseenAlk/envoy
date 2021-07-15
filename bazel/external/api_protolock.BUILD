@@ -2,45 +2,32 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 
 licenses(["notice"])  # Apache 2
 
-#go_binary(
-#    name = "protolock",
-#    deps = [
-#        "@com_github_nilslice_protolock//:protolocklibcmd",
-#        #"protolocklibcmd",
-#        #"protolocklibroot",
-#        #"protolocklibextend"
-#    ],
-#    visibility = ["//visibility:public"],
-#)
-
 go_binary(
     name = "protolock",
     srcs = [
         "cmd/protolock/main.go",
         "cmd/protolock/plugins.go",
     ],
-    #importpath = "main",
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_nilslice_protolock//:protolocklibextend",
-        "@com_github_nilslice_protolock//:protolocklibroot",
+        ":protolock_extend",
+        ":protolock_root",
     ],
 )
 
 go_library(
-    name = "protolocklibextend",
+    name = "protolock_extend",
     srcs = [
         "extend/plugin.go",
     ],
     importpath = "github.com/nilslice/protolock/extend",
-    visibility = ["//visibility:public"],
     deps = [
-        "@com_github_nilslice_protolock//:protolocklibroot",
+        ":protolock_root",
     ],
 )
 
 go_library(
-    name = "protolocklibroot",
+    name = "protolock_root",
     srcs = [
         "commit.go",
         "config.go",
@@ -54,7 +41,6 @@ go_library(
         "uptodate.go",
     ],
     importpath = "github.com/nilslice/protolock",
-    visibility = ["//visibility:public"],
     deps = [
         "@com_github_emicklei_proto//:proto_parsing_lib",
     ],
