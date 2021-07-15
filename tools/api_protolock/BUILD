@@ -38,11 +38,9 @@ py_test(
         "//tools/testdata/api_protolock:breaking/test_change_pgv_message_next",
         "//tools/testdata/api_protolock:breaking/test_change_pgv_oneof_current",
         "//tools/testdata/api_protolock:breaking/test_change_pgv_oneof_next",
+        "@com_github_nilslice_protolock//:protolock",
     ],
     python_version = "PY3",
     srcs_version = "PY3",
     visibility = ["//visibility:public"],
-    deps = [
-        "@com_github_nilslice_protolock",
-    ],
 )

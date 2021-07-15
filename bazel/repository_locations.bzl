@@ -287,6 +287,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-11-23",
         cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
     ),
+    com_github_nilslice_protolock = dict(
+        project_name = "protolock",
+        project_desc = "Track your .proto files and prevent changes to messages and services which impact API compatibility.",
+        project_url = "https://github.com/nilslice/protolock/",
+        version = "0.15.2",
+        sha256 = "26d0b491471866c4959a75a1418a577eab432782b9923fdf022535bb7c322374",
+        urls = ["https://github.com/nilslice/protolock/archive/refs/tags/v{version}.tar.gz"],
+        release_date = "2021-02-18",
+        use_category = ["api"],
+    ),
     io_opentracing_cpp = dict(
         project_name = "OpenTracing",
         project_desc = "Vendor-neutral APIs and instrumentation for distributed tracing",
