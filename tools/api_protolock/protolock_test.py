@@ -4,6 +4,7 @@ import tempfile
 from shutil import copyfile
 import io
 import subprocess
+from rules_python.python.runfiles import runfiles
 
 DEFAULT_PROTOLOCK_ARGS = ["--plugins="]
 
@@ -13,6 +14,9 @@ class ProtolockTests(unittest.TestCase):
     def setUp(self):
         # create a temporary directory to house the proto.lock file and current proto file
         self.temp_dir = tempfile.TemporaryDirectory()
+        #/usr/local/google/home/yaseena/envoy_fork/bazel-bin/tools/api_protolock/protolock_test.runfiles/com_github_nilslice_protolock/protolock_/protolock
+        self.protolock_path = runfiles.Create().Rlocation(
+            "com_github_nilslice_protolock/protolock_")
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -44,8 +48,9 @@ class ProtolockTests(unittest.TestCase):
         target = os.path.join(self.temp_dir.name, f"{testname}.proto")
         copyfile(current, target)
 
-        # TODO: change this to use envoy's run_command.py?
-        initial_result = subprocess.run(["protolock", "init", *protolock_args], capture_output=True)
+        # TODO: change this to use tools/run_command.py?
+        initial_result = subprocess.run([self.protolock_path, "init", *protolock_args],
+                                        capture_output=True)
 
         self.assertEqual(len(initial_result.stdout), 0)
         self.assertEqual(len(initial_result.stderr), 0)
@@ -56,7 +61,8 @@ class ProtolockTests(unittest.TestCase):
 
         copyfile(changed, target)
 
-        final_result = subprocess.run(["protolock", "commit", *protolock_args], capture_output=True)
+        final_result = subprocess.run([self.protolock_path, "commit", *protolock_args],
+                                      capture_output=True)
         with open(lock_location) as f:
             post_lock = f.readlines()
 

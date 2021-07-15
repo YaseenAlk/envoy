@@ -143,6 +143,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_moonjit_moonjit()
     _com_github_nghttp2_nghttp2()
     _com_github_nilslice_protolock()
+    _com_github_emicklei_proto()
     _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
     _com_github_alibaba_hessian2_codec()
@@ -514,6 +515,12 @@ def _com_github_nilslice_protolock():
     native.bind(
         name = "protolock",
         actual = "@com_github_nilslice_protolock//:protolock",
+    )
+
+def _com_github_emicklei_proto():
+    external_http_archive(
+        name = "com_github_emicklei_proto",
+        build_file = "@envoy//bazel/external:api_protolock_parser.BUILD",
     )
 
 def _com_google_googletest():

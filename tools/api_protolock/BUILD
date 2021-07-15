@@ -43,4 +43,5 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     visibility = ["//visibility:public"],
+    deps = ["@rules_python//python/runfiles"],
 )

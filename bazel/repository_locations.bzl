@@ -296,6 +296,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/nilslice/protolock/archive/refs/tags/v{version}.tar.gz"],
         release_date = "2021-02-18",
         use_category = ["api"],
+        strip_prefix = "protolock-{version}",
+    ),
+    com_github_emicklei_proto = dict(
+        project_name = "proto",
+        project_desc = "parser for Google ProtocolBuffers definition",
+        project_url = "https://github.com/emicklei/proto/",
+        version = "1.7.0",
+        sha256 = "e93272fea9e4f993b9d160440bf980d015970147907090834492771bb1c4510c",
+        urls = ["https://github.com/emicklei/proto/archive/refs/tags/v{version}.tar.gz"],
+        release_date = "2019-10-05",
+        use_category = ["api"],
+        strip_prefix = "proto-{version}",
     ),
     io_opentracing_cpp = dict(
         project_name = "OpenTracing",
