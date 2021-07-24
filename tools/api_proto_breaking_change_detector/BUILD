@@ -6,6 +6,9 @@ py_binary(
     name = "proto_breaking_change_detector",
     srcs = ["detector.py"],
     main = "detector.py",
+    deps = [
+        "//tools:run_command",
+    ],
 )
 
 py_test(

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import tempfile
 from rules_python.python.runfiles import runfiles
-import subprocess
+from tools.run_command import run_command
 from shutil import copyfile
 import os
 import re
@@ -11,8 +11,11 @@ import re
 class ProtoBreakingChangeDetector(ABC):
     # stateless
     @staticmethod
-    @abstractmethod
     def is_breaking(path_to_before, path_to_after):
+        pass
+
+    @staticmethod
+    def lock_file_changed(path_to_before, path_to_after):
         pass
 
 
@@ -57,11 +60,11 @@ class ProtolockWrapper(ProtoBreakingChangeDetector):
 
         copyfile(path_to_before, target)
 
-        # TODO: change this to use tools/run_command.py?
-        initial_result = subprocess.run([protolock_path, "init", *protolock_args],
-                                        capture_output=True)
+        initial_code, initial_out, initial_err = run_command(
+            ' '.join([protolock_path, "init", *protolock_args]))
+        initial_out, initial_err = ''.join(initial_out), ''.join(initial_err)
 
-        if len(initial_result.stdout) > 0 or len(initial_result.stderr) > 0:
+        if len(initial_out) > 0 or len(initial_err) > 0:
             raise ChangeDetectorInitializeError("Unexpected error during init")
 
         lock_location = os.path.join(temp_dir.name, "proto.lock")
@@ -70,26 +73,29 @@ class ProtolockWrapper(ProtoBreakingChangeDetector):
 
         copyfile(path_to_after, target)
 
-        # TODO: change this to use tools/run_command.py?
-        final_result = subprocess.run([protolock_path, "commit", *protolock_args],
-                                      capture_output=True)
+        final_code, final_out, final_err = run_command(
+            ' '.join([protolock_path, "commit", *protolock_args]))
+        final_out, final_err = ''.join(final_out), ''.join(final_err)
         with open(lock_location) as f:
             final_lock = f.readlines()
 
         temp_dir.cleanup()
 
-        return initial_result, final_result, initial_lock, final_lock
+        return (initial_code, initial_out,
+                initial_err), (final_code, final_out, final_err), initial_lock, final_lock
 
     @staticmethod
     def is_breaking(path_to_before, path_to_after, additional_args=None):
         _, final_result, _, _ = ProtolockWrapper._run_protolock(
             path_to_before, path_to_after, additional_args)
+
+        _, final_out, final_err = final_result
+
         # Ways protolock output could be indicative of a breaking change:
         # 1) stdout/stderr is nonempty
         # 2) stdout/stderr contains "CONFLICT"
         break_condition = lambda inp: len(inp) > 0 or bool(re.match(r"CONFLICT", inp))
-        return break_condition(final_result.stdout.decode('utf-8')) or break_condition(
-            final_result.stderr.decode('utf-8'))
+        return break_condition(final_out) or break_condition(final_err)
 
     @staticmethod
     def lock_file_changed(path_to_before, path_to_after, additional_args=None):
