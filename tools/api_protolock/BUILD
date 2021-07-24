@@ -1,6 +1,11 @@
-load("@rules_python//python:defs.bzl", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 
 licenses(["notice"])  # Apache 2
+
+py_binary(
+    name = "protolock",
+    srcs = ["protolock.py"],
+)
 
 py_test(
     name = "protolock_test",
@@ -43,5 +48,8 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     visibility = ["//visibility:public"],
-    deps = ["@rules_python//python/runfiles"],
+    deps = [
+        ":protolock",
+        "@rules_python//python/runfiles",
+    ],
 )
