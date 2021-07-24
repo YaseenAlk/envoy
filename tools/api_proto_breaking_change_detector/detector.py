@@ -3,8 +3,8 @@ import tempfile
 from rules_python.python.runfiles import runfiles
 from tools.run_command import run_command
 from shutil import copyfile
-import os
 import re
+from pathlib import Path
 
 
 # generic breaking change detector for protos, extended by a wrapper class for a breaking change detector
@@ -40,10 +40,10 @@ class ProtolockWrapper(ProtoBreakingChangeDetector):
         # 4) protolock commit
         # 5) check for differences (if changes are breaking, there should be none)
 
-        if not os.path.isfile(path_to_before):
+        if not Path(path_to_before).is_file():
             raise ValueError(f"path_to_before {path_to_before} does not exist")
 
-        if not os.path.isfile(path_to_after):
+        if not Path(path_to_after).is_file():
             raise ValueError(f"path_to_after {path_to_after} does not exist")
 
         temp_dir = tempfile.TemporaryDirectory()
@@ -55,8 +55,7 @@ class ProtolockWrapper(ProtoBreakingChangeDetector):
         if additional_args is not None:
             protolock_args.extend(additional_args)
 
-        target = os.path.join(
-            temp_dir.name, f"{os.path.basename(path_to_before).split('.')[0]}.proto")
+        target = Path(temp_dir.name, f"{Path(path_to_before).stem}.proto")
 
         copyfile(path_to_before, target)
 
@@ -67,7 +66,7 @@ class ProtolockWrapper(ProtoBreakingChangeDetector):
         if len(initial_out) > 0 or len(initial_err) > 0:
             raise ChangeDetectorInitializeError("Unexpected error during init")
 
-        lock_location = os.path.join(temp_dir.name, "proto.lock")
+        lock_location = Path(temp_dir.name, "proto.lock")
         with open(lock_location) as f:
             initial_lock = f.readlines()
 

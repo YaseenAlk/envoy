@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 import unittest
 
 from detector import ProtolockWrapper, ChangeDetectorInitializeError
@@ -9,13 +9,13 @@ class ProtolockTests(unittest.TestCase):
     def run_protolock_test(self, testname, is_breaking, expects_changes, additional_args=None):
         # there's probably a better/safer way to navigate
         # but it seems like check_spelling_pedantic_test.py takes this approach as well
-        tests_path = os.path.join(
-            os.path.dirname(os.path.realpath(__file__)), "..", "testdata",
+        tests_path = Path(
+            Path(__file__).absolute().parent.parent, "testdata",
             "api_proto_breaking_change_detector", "breaking" if is_breaking else "allowed")
 
         # check that test files exist
-        current = os.path.join(tests_path, f"{testname}_current")
-        changed = os.path.join(tests_path, f"{testname}_next")
+        current = Path(tests_path, f"{testname}_current")
+        changed = Path(tests_path, f"{testname}_next")
 
         breaking_response = ProtolockWrapper.is_breaking(current, changed, additional_args)
         self.assertEqual(breaking_response, is_breaking)
