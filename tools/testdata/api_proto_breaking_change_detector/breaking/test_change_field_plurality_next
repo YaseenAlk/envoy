@@ -1,5 +1,5 @@
 syntax = "proto3";
-package testingprotos;
+package test.protos.breaking;
 
 message SampleMessage {
     repeated string from = 1;

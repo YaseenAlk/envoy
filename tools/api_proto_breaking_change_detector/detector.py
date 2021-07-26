@@ -101,3 +101,24 @@ class ProtolockWrapper(ProtoBreakingChangeDetector):
         _, _, initial_lock, final_lock = ProtolockWrapper._run_protolock(
             path_to_before, path_to_after, additional_args)
         return any(before != after for before, after in zip(initial_lock, final_lock))
+
+
+class BufWrapper(ProtoBreakingChangeDetector):
+
+    @staticmethod
+    def is_breaking(path_to_before, path_to_after, additional_args=None):
+        if not Path(path_to_before).is_file():
+            raise ValueError(f"path_to_before {path_to_before} does not exist")
+
+        if not Path(path_to_after).is_file():
+            raise ValueError(f"path_to_after {path_to_after} does not exist")
+
+        temp_dir = tempfile.TemporaryDirectory()
+
+        # 1) copy start file into temp dir
+        # 2) protolock init
+        # 3) copy changed file into temp dir
+        # 4) protolock commit
+        # 5) check for differences (if changes are breaking, there should be none)
+
+        pass
