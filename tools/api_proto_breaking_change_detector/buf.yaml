@@ -7,6 +7,3 @@ deps:
     - buf.build/beta/opencensus
     - buf.build/beta/prometheus
     - buf.build/beta/opentelemetry
-build:
-  roots:
-    - api
