@@ -5,6 +5,7 @@ from tools.run_command import run_command
 from shutil import copyfile
 import re
 from pathlib import Path
+import os
 
 
 # generic breaking change detector for protos, extended by a wrapper class for a breaking change detector
@@ -40,22 +41,39 @@ class BufWrapper(ProtoBreakingChangeDetector):
         if not Path(path_to_after).is_file():
             raise ValueError(f"path_to_after {path_to_after} does not exist")
 
-        # 1) copy buf.yaml and buf.lock into temp dir
-        # 2) copy start file into temp dir
-        # 3) buf build -o tmp_file
-        # 4) copy changed file into temp dir
-        # 5) buf breaking --against tmp_file
-        # 6) check for differences (if changes are breaking, there should be none)
+        # 1) pull buf BSR dependencies with buf mod update (? still need to figure this out. commented out for now)
+        # 2) copy buf.yaml into temp dir
+        # 3) copy start file into temp dir
+        # 4) buf build -o tmp_file
+        # 5) copy changed file into temp dir
+        # 6) buf breaking --against tmp_file
+        # 7) check for differences (if changes are breaking, there should be none)
 
-        temp_dir = tempfile.TemporaryDirectory()
-        buf_path = runfiles.Create().Rlocation("")  # TODO point to buf binary
+        temp_dir = tempfile.TemporaryDirectory(
+            prefix=str(Path(".").absolute())
+            + os.sep)  # protobuf files must be in a subdirectory of buf binary >:(
+        buf_path = runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf")
 
-        copyfile(Path(".", "buf.lock"), Path(temp_dir.name, "buf.lock"))
-        copyfile(Path(".", "buf.yaml"), Path(temp_dir.name, "buf.yaml"))
+        buf_config_loc = Path(".", "tools", "api_proto_breaking_change_detector")
+
+        #copyfile(Path(buf_config_loc, "buf.lock"), Path(".", "buf.lock")) # not needed? refer to comment below
+        yaml_file_loc = Path(".", "buf.yaml")
+        copyfile(Path(buf_config_loc, "buf.yaml"), yaml_file_loc)
+
+        # TODO: figure out how to automatically pull buf deps
+        # `buf mod update` doesn't seem to do anything, and the first test will fail because it forces buf to automatically start downloading the deps
+        #        bcode, bout, berr = run_command(f"{buf_path} mod update")
+        #        bout, berr = ''.join(bout), ''.join(berr)
 
         target = Path(temp_dir.name, f"{Path(path_to_before).stem}.proto")
 
-        buf_args = ["--path", target]
+        buf_args = [
+            "--path",
+            str(target.relative_to(
+                Path(".").absolute())),  # buf requires relative pathing for roots...
+            "--config",
+            str(yaml_file_loc),
+        ]
         if additional_args is not None:
             buf_args.extend(additional_args)
 
@@ -78,6 +96,12 @@ class BufWrapper(ProtoBreakingChangeDetector):
             ' '.join(
                 [buf_path, f"breaking --against {Path(temp_dir.name, BUF_LOCK_FILE)}", *buf_args]))
         final_out, final_err = ''.join(final_out), ''.join(final_err)
+
+        # new with buf: lock must be manually re-built
+        # but here we only re-build if there weren't any detected breaking changes
+        if len(final_out) == len(final_err) == 0:
+            _, _, _ = run_command(
+                ' '.join([buf_path, f"build -o {Path(temp_dir.name, BUF_LOCK_FILE)}", *buf_args]))
         with open(lock_location) as f:
             final_lock = f.readlines()
 
