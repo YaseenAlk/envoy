@@ -5,7 +5,13 @@ licenses(["notice"])  # Apache 2
 py_binary(
     name = "proto_breaking_change_detector",
     srcs = ["detector.py"],
+    data = [
+        "//tools/api_proto_breaking_change_detector:buf.lock",
+        "//tools/api_proto_breaking_change_detector:buf.yaml",
+        "@com_github_bufbuild_buf//:buf",
+    ],
     main = "detector.py",
+    tags = ["manual"],
     deps = [
         "//tools:run_command",
     ],
@@ -47,10 +53,12 @@ py_test(
         "//tools/testdata/api_proto_breaking_change_detector:breaking/test_change_pgv_message_next",
         "//tools/testdata/api_proto_breaking_change_detector:breaking/test_change_pgv_oneof_current",
         "//tools/testdata/api_proto_breaking_change_detector:breaking/test_change_pgv_oneof_next",
+        "@com_github_bufbuild_buf//:buf",
     ],
     main = "detector_test.py",
     python_version = "PY3",
     srcs_version = "PY3",
+    tags = ["manual"],
     visibility = ["//visibility:public"],
     deps = [
         ":proto_breaking_change_detector",
