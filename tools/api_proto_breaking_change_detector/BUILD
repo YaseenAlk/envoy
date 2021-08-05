@@ -21,6 +21,7 @@ py_test(
     name = "proto_breaking_change_detector_test",
     srcs = ["detector_test.py"],
     data = [
+        ":buf.yaml",
         "//tools/testdata/api_proto_breaking_change_detector:proto_breaking_change_detector_testdata",
         "@com_github_bufbuild_buf//:buf",
     ],

@@ -10,7 +10,13 @@ and ensure that tool behavior is consistent across dependency updates.
 from pathlib import Path
 import unittest
 
-from detector import BufWrapper
+from detector import BufWrapper, BUF_STATE_FILE, ChangeDetectorInitializeError
+
+import tempfile
+from rules_python.python.runfiles import runfiles
+from tools.run_command import run_command
+from shutil import copyfile
+import os
 
 
 class BreakingChangeDetectorTests(object):
@@ -18,6 +24,9 @@ class BreakingChangeDetectorTests(object):
 
     def run_detector_test(self, testname, is_breaking, expects_changes, additional_args=None):
         """Runs a test case for an arbitrary breaking change detector type"""
+
+        buf_config_loc = Path(".", "tools", "api_proto_breaking_change_detector")
+
         tests_path = Path(
             Path(__file__).absolute().parent.parent, "testdata",
             "api_proto_breaking_change_detector", "breaking" if is_breaking else "allowed")
@@ -25,14 +34,42 @@ class BreakingChangeDetectorTests(object):
         current = Path(tests_path, f"{testname}_current")
         changed = Path(tests_path, f"{testname}_next")
 
-        detector_obj = self.detector_type(current, changed, additional_args)
-        detector_obj.run_detector()
+        # buf requires protobuf files to be in a subdirectory of the yaml file
+        with tempfile.TemporaryDirectory(prefix=str(Path(".").absolute()) + os.sep) as temp_dir:
+            target = Path(temp_dir, f"{testname}.proto")
+            copyfile(current, target)
 
-        breaking_response = detector_obj.is_breaking()
-        self.assertEqual(breaking_response, is_breaking)
+            buf_path = runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf")
+            yaml_file_loc = Path(".", "tools", "api_proto_breaking_change_detector", "buf.yaml")
+            buf_args = [
+                "--path",
+                # buf requires relative pathing for roots
+                str(target.relative_to(Path(".").absolute())),
+                "--config",
+                str(yaml_file_loc),
+            ]
+            buf_args.extend(additional_args or [])
+            lock_location = Path(temp_dir, BUF_STATE_FILE)
 
-        lock_file_changed_response = detector_obj.lock_file_changed()
-        self.assertEqual(lock_file_changed_response, expects_changes)
+            initial_code, initial_out, initial_err = run_command(
+                ' '.join([buf_path, f"build -o {lock_location}", *buf_args]))
+            initial_out, initial_err = ''.join(initial_out), ''.join(initial_err)
+
+            if initial_code != 0 or len(initial_out) > 0 or len(initial_err) > 0:
+                raise ChangeDetectorInitializeError(
+                    f"Unexpected error during init:\n\tExit Status Code: {initial_code}\n\tstdout: {initial_out}\n\t stderr: {initial_err}\n"
+                )
+
+            copyfile(changed, target)
+
+            detector_obj = self.detector_type(lock_location, temp_dir, additional_args)
+            detector_obj.run_detector()
+
+            breaking_response = detector_obj.is_breaking()
+            self.assertEqual(breaking_response, is_breaking)
+
+            lock_file_changed_response = detector_obj.lock_file_changed()
+            self.assertEqual(lock_file_changed_response, expects_changes)
 
 
 class TestBreakingChanges(BreakingChangeDetectorTests):

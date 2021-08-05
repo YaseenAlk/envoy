@@ -13,7 +13,6 @@ if there was a breaking change.
 The tool is currently implemented with buf (https://buf.build/)
 """
 
-import tempfile
 from rules_python.python.runfiles import runfiles
 from tools.run_command import run_command
 from shutil import copyfile
@@ -25,19 +24,20 @@ from typing import List
 class ProtoBreakingChangeDetector(object):
     """Abstract breaking change detector interface"""
 
-    def __init__(self, path_to_before: str, path_to_after: str) -> None:
+    def __init__(self, path_to_lock_file: str, path_to_changed_dir: str) -> None:
         """Initialize the configuration of the breaking change detector
 
         This function sets up any necessary config without actually
         running the detector against any proto files.
 
+        #TODO change description
         Takes in a single protobuf as 2 files, in a ``before`` state
         and an ``after`` state, and checks if the ``after`` state
         violates any breaking change rules.
 
         Args:
-            path_to_before {str} -- absolute path to the .proto file in the before state
-            path_to_after {str} -- absolute path to the .proto file in the after state
+            path_to_lock_file {str} -- #TODO change description
+            path_to_changed_dir {str} -- #TODO change description
         """
         pass
 
@@ -82,71 +82,63 @@ class BufWrapper(ProtoBreakingChangeDetector):
 
     def __init__(
             self,
-            path_to_before: str,
-            path_to_after: str,
+            path_to_lock_file: str,
+            path_to_changed_dir: str,
             additional_args: List[str] = None) -> None:
-        if not Path(path_to_before).is_file():
-            raise ValueError(f"path_to_before {path_to_before} does not exist")
+        if not Path(path_to_lock_file).is_file():
+            raise ValueError(f"path_to_lock_file {path_to_lock_file} is not a file path")
 
-        if not Path(path_to_after).is_file():
-            raise ValueError(f"path_to_after {path_to_after} does not exist")
+        if not Path(path_to_changed_dir).is_dir():
+            raise ValueError(f"path_to_changed_dir {path_to_changed_dir} is not a valid directory")
 
-        self._path_to_before = path_to_before
-        self._path_to_after = path_to_after
+        if Path(".").absolute() not in Path(path_to_changed_dir).parents:
+            raise ValueError(
+                f"path_to_changed_dir {path_to_changed_dir} must be a subdirectory of the cwd ({ Path('.').absolute() })"
+            )
+
+        self._path_to_lock_file = path_to_lock_file
+        self._path_to_changed_dir = path_to_changed_dir
         self._additional_args = additional_args
+        self.final_lock = None
 
     def run_detector(self) -> None:
-        # buf requires protobuf files to be in a subdirectory of the yaml file
-        with tempfile.TemporaryDirectory(prefix=str(Path(".").absolute()) + os.sep) as temp_dir:
-            buf_path = runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf")
+        with open(self._path_to_lock_file) as f:
+            initial_lock = f.readlines()
 
-            buf_config_loc = Path(".", "tools", "api_proto_breaking_change_detector")
+        buf_path = runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf")
 
-            yaml_file_loc = Path(".", "buf.yaml")
-            copyfile(Path(buf_config_loc, "buf.yaml"), yaml_file_loc)
+        buf_config_loc = Path(".", "tools", "api_proto_breaking_change_detector")
 
-            target = Path(temp_dir, f"{Path(self._path_to_before).stem}.proto")
+        #copyfile(Path(buf_config_loc, "buf.lock"), Path(".", "buf.lock")) # not needed? refer to comment below
+        yaml_file_loc = Path(".", "buf.yaml")
+        copyfile(Path(buf_config_loc, "buf.yaml"), yaml_file_loc)
 
-            buf_args = [
-                "--path",
-                # buf requires relative pathing for roots
-                str(target.relative_to(Path(".").absolute())),
-                "--config",
-                str(yaml_file_loc),
-            ]
-            buf_args.extend(self._additional_args or [])
+        # TODO: figure out how to automatically pull buf deps
+        # `buf mod update` doesn't seem to do anything, and the first test will fail because it forces buf to automatically start downloading the deps
+        #        bcode, bout, berr = run_command(f"{buf_path} mod update")
+        #        bout, berr = ''.join(bout), ''.join(berr)
 
-            copyfile(self._path_to_before, target)
+        buf_args = [
+            "--path",
+            # buf requires relative pathing for roots
+            str(Path(self._path_to_changed_dir).relative_to(Path(".").absolute())),
+            "--config",
+            str(yaml_file_loc),
+        ]
+        buf_args.extend(self._additional_args or [])
 
-            lock_location = Path(temp_dir, BUF_STATE_FILE)
+        final_code, final_out, final_err = run_command(
+            ' '.join([buf_path, f"breaking --against {self._path_to_lock_file}", *buf_args]))
+        final_out, final_err = ''.join(final_out), ''.join(final_err)
 
-            initial_code, initial_out, initial_err = run_command(
-                ' '.join([buf_path, f"build -o {lock_location}", *buf_args]))
-            initial_out, initial_err = ''.join(initial_out), ''.join(initial_err)
+        new_lock_location = Path(self._path_to_changed_dir, BUF_STATE_FILE)
+        if len(final_out) == len(final_err) == final_code == 0:
+            _, _, _ = run_command(' '.join([buf_path, f"build -o {new_lock_location}", *buf_args]))
+            with open(new_lock_location, "r") as f:
+                self.final_lock = f.readlines()
 
-            if initial_code != 0 or len(initial_out) > 0 or len(initial_err) > 0:
-                raise ChangeDetectorInitializeError(
-                    f"Unexpected error during init:\n\tExit Status Code: {initial_code}\n\tstdout: {initial_out}\n\t stderr: {initial_err}\n"
-                )
-
-            with open(lock_location, "r") as f:
-                initial_lock = f.readlines()
-
-            copyfile(self._path_to_after, target)
-
-            final_code, final_out, final_err = run_command(
-                ' '.join([buf_path, f"breaking --against {lock_location}", *buf_args]))
-            final_out, final_err = ''.join(final_out), ''.join(final_err)
-
-            if len(final_out) == len(final_err) == final_code == 0:
-                _, _, _ = run_command(' '.join([buf_path, f"build -o {lock_location}", *buf_args]))
-            with open(lock_location, "r") as f:
-                final_lock = f.readlines()
-
-            self.initial_result = initial_code, initial_out, initial_err
-            self.final_result = final_code, final_out, final_err
-            self.initial_lock = initial_lock
-            self.final_lock = final_lock
+        self.final_result = final_code, final_out, final_err
+        self.initial_lock = initial_lock
 
     def is_breaking(self) -> bool:
         final_code, final_out, final_err = self.final_result
@@ -160,4 +152,5 @@ class BufWrapper(ProtoBreakingChangeDetector):
         return False
 
     def lock_file_changed(self) -> bool:
-        return any(before != after for before, after in zip(self.initial_lock, self.final_lock))
+        return self.final_lock is not None and any(
+            before != after for before, after in zip(self.initial_lock, self.final_lock))
