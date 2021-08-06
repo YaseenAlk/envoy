@@ -17,6 +17,7 @@ from rules_python.python.runfiles import runfiles
 from tools.run_command import run_command
 from shutil import copyfile
 import os
+from buf_utils import make_lock, check_breaking
 
 
 class BreakingChangeDetectorTests(object):
@@ -24,8 +25,6 @@ class BreakingChangeDetectorTests(object):
 
     def run_detector_test(self, testname, is_breaking, expects_changes, additional_args=None):
         """Runs a test case for an arbitrary breaking change detector type"""
-
-        buf_config_loc = Path(".", "tools", "api_proto_breaking_change_detector")
 
         tests_path = Path(
             Path(__file__).absolute().parent.parent, "testdata",
@@ -38,27 +37,10 @@ class BreakingChangeDetectorTests(object):
         with tempfile.TemporaryDirectory(prefix=str(Path(".").absolute()) + os.sep) as temp_dir:
             target = Path(temp_dir, f"{testname}.proto")
             copyfile(current, target)
-
-            buf_path = runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf")
-            yaml_file_loc = Path(".", "tools", "api_proto_breaking_change_detector", "buf.yaml")
-            buf_args = [
-                "--path",
-                # buf requires relative pathing for roots
-                str(target.relative_to(Path(".").absolute())),
-                "--config",
-                str(yaml_file_loc),
-            ]
-            buf_args.extend(additional_args or [])
             lock_location = Path(temp_dir, BUF_STATE_FILE)
 
-            initial_code, initial_out, initial_err = run_command(
-                ' '.join([buf_path, f"build -o {lock_location}", *buf_args]))
-            initial_out, initial_err = ''.join(initial_out), ''.join(initial_err)
-
-            if initial_code != 0 or len(initial_out) > 0 or len(initial_err) > 0:
-                raise ChangeDetectorInitializeError(
-                    f"Unexpected error during init:\n\tExit Status Code: {initial_code}\n\tstdout: {initial_out}\n\t stderr: {initial_err}\n"
-                )
+            initial_code, initial_out, initial_err = make_lock(
+                temp_dir, lock_location, additional_args)
 
             copyfile(changed, target)
 

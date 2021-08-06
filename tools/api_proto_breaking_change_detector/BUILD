@@ -4,7 +4,10 @@ licenses(["notice"])  # Apache 2
 
 py_binary(
     name = "proto_breaking_change_detector",
-    srcs = ["detector.py"],
+    srcs = [
+        "buf_utils.py",
+        "detector.py",
+    ],
     data = [
         ":buf.lock",
         ":buf.yaml",
