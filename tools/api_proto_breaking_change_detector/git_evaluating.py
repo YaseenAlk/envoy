@@ -35,6 +35,7 @@ build:
     - api
 {2}
 breaking:
+  ignore_unstable_packages: true
   use:
 {1}
 """
