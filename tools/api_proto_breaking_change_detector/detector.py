@@ -13,8 +13,8 @@ if there was a breaking change.
 The tool is currently implemented with buf (https://buf.build/)
 """
 
-from rules_python.python.runfiles import runfiles
 from tools.run_command import run_command
+from buf_utils import check_breaking, make_lock
 from shutil import copyfile
 from pathlib import Path
 import os
@@ -66,14 +66,6 @@ class ProtoBreakingChangeDetector(object):
         pass
 
 
-class ChangeDetectorError(Exception):
-    pass
-
-
-class ChangeDetectorInitializeError(ChangeDetectorError):
-    pass
-
-
 BUF_STATE_FILE = "tmp.json"
 
 
@@ -84,7 +76,8 @@ class BufWrapper(ProtoBreakingChangeDetector):
             self,
             path_to_lock_file: str,
             path_to_changed_dir: str,
-            additional_args: List[str] = None) -> None:
+            additional_args: List[str] = None,
+            buf_path: str = None) -> None:
         if not Path(path_to_lock_file).is_file():
             raise ValueError(f"path_to_lock_file {path_to_lock_file} is not a file path")
 
@@ -100,12 +93,11 @@ class BufWrapper(ProtoBreakingChangeDetector):
         self._path_to_changed_dir = path_to_changed_dir
         self._additional_args = additional_args
         self.final_lock = None
+        self._buf_path = buf_path or "buf"
 
     def run_detector(self) -> None:
         with open(self._path_to_lock_file) as f:
             initial_lock = f.readlines()
-
-        buf_path = runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf")
 
         buf_config_loc = Path(".", "tools", "api_proto_breaking_change_detector")
 
@@ -118,22 +110,11 @@ class BufWrapper(ProtoBreakingChangeDetector):
         #        bcode, bout, berr = run_command(f"{buf_path} mod update")
         #        bout, berr = ''.join(bout), ''.join(berr)
 
-        buf_args = [
-            "--path",
-            # buf requires relative pathing for roots
-            str(Path(self._path_to_changed_dir).relative_to(Path(".").absolute())),
-            "--config",
-            str(yaml_file_loc),
-        ]
-        buf_args.extend(self._additional_args or [])
-
-        final_code, final_out, final_err = run_command(
-            ' '.join([buf_path, f"breaking --against {self._path_to_lock_file}", *buf_args]))
-        final_out, final_err = ''.join(final_out), ''.join(final_err)
+        final_code, final_out, final_err = check_breaking(self._buf_path, self._path_to_changed_dir, self._path_to_lock_file, self._additional_args)
 
         new_lock_location = Path(self._path_to_changed_dir, BUF_STATE_FILE)
         if len(final_out) == len(final_err) == final_code == 0:
-            _, _, _ = run_command(' '.join([buf_path, f"build -o {new_lock_location}", *buf_args]))
+            make_lock(self._buf_path, self._path_to_changed_dir, new_lock_location, self._additional_args)
             with open(new_lock_location, "r") as f:
                 self.final_lock = f.readlines()
 

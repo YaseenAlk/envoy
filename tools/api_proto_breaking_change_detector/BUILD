@@ -7,6 +7,7 @@ py_binary(
     srcs = [
         "buf_utils.py",
         "detector.py",
+        "detector_errors.py"
     ],
     data = [
         ":buf.lock",
