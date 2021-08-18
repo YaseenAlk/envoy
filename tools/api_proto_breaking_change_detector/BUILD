@@ -7,11 +7,11 @@ py_binary(
     srcs = [
         "buf_utils.py",
         "detector.py",
-        "detector_errors.py"
+        "detector_errors.py",
     ],
     data = [
+        "//:proto_breaking_change_detector_buf_config",
         "@com_github_bufbuild_buf//:buf",
-        "//:proto_breaking_change_detector_buf_config"
     ],
     main = "detector.py",
     tags = ["manual"],

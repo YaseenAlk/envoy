@@ -14,7 +14,7 @@ The tool is currently implemented with buf (https://buf.build/)
 """
 
 from tools.run_command import run_command
-from buf_utils import check_breaking, make_lock
+from buf_utils import check_breaking, make_lock, pull_buf_deps
 from shutil import copyfile
 from pathlib import Path
 import os
@@ -69,9 +69,6 @@ class ProtoBreakingChangeDetector(object):
         pass
 
 
-BUF_STATE_FILE = "tmp.json"
-
-
 class BufWrapper(ProtoBreakingChangeDetector):
     """Breaking change detector implemented with buf"""
 
@@ -96,43 +93,50 @@ class BufWrapper(ProtoBreakingChangeDetector):
         self._path_to_lock_file = path_to_lock_file
         self._path_to_changed_dir = path_to_changed_dir
         self._additional_args = additional_args
-        self.final_lock = None
+        self._final_lock = None
         self._buf_path = buf_path or "buf"
         self._config_file_loc = config_file_loc
 
-    def run_detector(self) -> None:
-        with open(self._path_to_lock_file) as f:
-            initial_lock = f.readlines()
+        locktype = Path(self._path_to_lock_file).suffix
+        self._is_lock_text_file = locktype == '.json'
 
-        final_code, final_out, final_err = check_breaking(
+        pull_buf_deps(
+            self._buf_path,
+            self._path_to_changed_dir,
+            config_file_loc=self._config_file_loc,
+            additional_args=self._additional_args)
+
+    def run_detector(self) -> None:
+        if self._is_lock_text_file:
+            with open(self._path_to_lock_file, mode='r') as f:
+                self._initial_lock = f.readlines()
+        else:
+            with open(self._path_to_lock_file, mode='rb') as f:
+                self._initial_lock = f.read()
+
+        self._final_result = check_breaking(
             self._buf_path, self._path_to_changed_dir, self._path_to_lock_file,
             self._config_file_loc, self._additional_args)
-        compressed_out, compressed_err = '\n'.join(final_out), '\n'.join(final_err)
 
-        new_lock_location = Path(self._path_to_changed_dir, BUF_STATE_FILE)
-        if len(compressed_out) == len(compressed_err) == final_code == 0:
-            make_lock(
-                self._buf_path,
-                self._path_to_changed_dir,
-                new_lock_location,
-                config_file_loc=self._config_file_loc,
-                additional_args=self._additional_args)
-            with open(new_lock_location, "r") as f:
-                self.final_lock = f.readlines()
+    def update_lock_file(self, force=False):
+        if not force and self.is_breaking():
+            return
 
-        self.final_result = final_code, final_out, final_err
-        self.initial_lock = initial_lock
-
-    def update_lock_file(self):
         make_lock(
             self._buf_path,
             self._path_to_changed_dir,
             self._path_to_lock_file,
             config_file_loc=self._config_file_loc,
             additional_args=self._additional_args)
+        if self._is_lock_text_file:
+            with open(self._path_to_lock_file, mode='r') as f:
+                self._final_lock = f.readlines()
+        else:
+            with open(self._path_to_lock_file, mode='rb') as f:
+                self._final_lock = f.read()
 
     def is_breaking(self) -> bool:
-        final_code, final_out, final_err = self.final_result
+        final_code, final_out, final_err = self._final_result
         final_out, final_err = '\n'.join(final_out), '\n'.join(final_err)
 
         if final_code != 0:
@@ -144,9 +148,14 @@ class BufWrapper(ProtoBreakingChangeDetector):
         return False
 
     def get_breaking_changes(self) -> List[str]:
-        _, final_out, _ = self.final_result
-        return final_out if self.is_breaking() else []
+        _, final_out, _ = self._final_result
+        return filter(lambda x: len(x) > 0, final_out) if self.is_breaking() else []
 
     def lock_file_changed(self) -> bool:
-        return self.final_lock is not None and any(
-            before != after for before, after in zip(self.initial_lock, self.final_lock))
+        if not self._final_lock:
+            return False
+        if not self._is_lock_text_file:
+            return self._initial_lock != self._final_lock
+        else:
+            return any(
+                before != after for before, after in zip(self._initial_lock, self._final_lock))

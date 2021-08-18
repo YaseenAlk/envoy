@@ -30,11 +30,14 @@ breaking:
 
 
 def _generate_buf_args(target_path, config_file_loc, additional_args):
-    buf_args = [
-        "--path",
-        # buf requires relative pathing for roots
-        str(Path(target_path).relative_to(Path(".").absolute())),
-    ]
+    buf_args = []
+
+    # buf requires relative pathing for roots
+    target_relative = Path(target_path).absolute().relative_to(Path(".").absolute())
+
+    # buf does not accept . as a root; if we are already in the target dir, no need for a --path arg
+    if target_relative != Path("."):
+        buf_args.extend(["--path", str(target_relative)])
 
     if config_file_loc:
         buf_args.extend(["--config", str(config_file_loc)])
@@ -45,7 +48,6 @@ def _generate_buf_args(target_path, config_file_loc, additional_args):
 
 
 def pull_buf_deps(buf_path, target_path, config_file_loc=None, additional_args=None):
-    # TODO: reconsider if this cd is necessary
     if config_file_loc:
         os.chdir(Path(config_file_loc).parent)
 

@@ -10,7 +10,7 @@ and ensure that tool behavior is consistent across dependency updates.
 from pathlib import Path
 import unittest
 
-from detector import ProtoBreakingChangeDetector, BufWrapper, BUF_STATE_FILE
+from detector import ProtoBreakingChangeDetector, BufWrapper
 from detector_errors import ChangeDetectorInitializeError
 
 import tempfile
@@ -59,6 +59,7 @@ class BreakingChangeDetectorTests(object):
 
             detector_obj = self.create_detector(lock_location, changed_dir, additional_args)
             detector_obj.run_detector()
+            detector_obj.update_lock_file()
 
         breaking_response = detector_obj.is_breaking()
         self.assertEqual(breaking_response, is_breaking)
@@ -127,12 +128,13 @@ class TestAllowedChanges(BreakingChangeDetectorTests):
 class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
     _config_file_loc = Path(".", "buf.yaml")
     _buf_path = runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf")
+    _buf_state_file = "tmp.json"
 
     def initialize_test(
             self, testname, target_path, current_file, changed_file, additional_args=None):
         target = Path(target_path, f"{testname}.proto")
         copyfile(current_file, target)
-        lock_location = Path(target_path, BUF_STATE_FILE)
+        lock_location = Path(target_path, self._buf_state_file)
 
         bazel_buf_config_loc = Path(".", "api", "buf.yaml")
         copyfile(bazel_buf_config_loc, self._config_file_loc)
