@@ -10,7 +10,7 @@ and ensure that tool behavior is consistent across dependency updates.
 from pathlib import Path
 import unittest
 
-from detector import BufWrapper, BUF_STATE_FILE
+from detector import ProtoBreakingChangeDetector, BufWrapper, BUF_STATE_FILE
 from detector_errors import ChangeDetectorInitializeError
 
 import tempfile
@@ -18,12 +18,11 @@ from rules_python.python.runfiles import runfiles
 from tools.run_command import run_command
 from shutil import copyfile
 import os
-from buf_utils import make_lock, check_breaking
+from buf_utils import make_lock, pull_buf_deps
 from typing import Tuple
 
 
 class BreakingChangeDetectorTests(object):
-    detector_type = None
 
     def initialize_test(self, testname, current_file, changed_file, additional_args=None):
         """Initializes a test case by creating a lock file
@@ -37,7 +36,11 @@ class BreakingChangeDetectorTests(object):
         """
         pass
 
-    def create_detector(self, lock_location, changed_directory, additional_args=None):
+    def create_detector(
+            self,
+            lock_location,
+            changed_directory,
+            additional_args=None) -> ProtoBreakingChangeDetector:
         pass
 
     def run_detector_test(self, testname, is_breaking, expects_changes, additional_args=None):
@@ -122,7 +125,8 @@ class TestAllowedChanges(BreakingChangeDetectorTests):
 
 
 class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
-    detector_type = BufWrapper
+    _config_file_loc = Path(".", "buf.yaml")
+    _buf_path = runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf")
 
     def initialize_test(
             self, testname, target_path, current_file, changed_file, additional_args=None):
@@ -130,15 +134,33 @@ class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
         copyfile(current_file, target)
         lock_location = Path(target_path, BUF_STATE_FILE)
 
-        make_lock(runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf"), 
-            target_path, lock_location, additional_args)
+        bazel_buf_config_loc = Path(".", "api", "buf.yaml")
+        copyfile(bazel_buf_config_loc, self._config_file_loc)
+
+        pull_buf_deps(
+            self._buf_path,
+            target_path,
+            config_file_loc=self._config_file_loc,
+            additional_args=additional_args)
+
+        make_lock(
+            self._buf_path,
+            target_path,
+            lock_location,
+            config_file_loc=self._config_file_loc,
+            additional_args=additional_args)
 
         copyfile(changed_file, target)
 
         return lock_location, target_path
-    
-    def create_detector(self, lock_location, changed_directory, additional_args=None):
-        return BufWrapper(lock_location, changed_directory, additional_args=additional_args, buf_path=runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf"))
+
+    def create_detector(self, lock_location, changed_directory, additional_args=None) -> BufWrapper:
+        return BufWrapper(
+            lock_location,
+            changed_directory,
+            additional_args=additional_args,
+            buf_path=self._buf_path,
+            config_file_loc=self._config_file_loc)
 
     @unittest.skip("PGV field support not yet added to buf")
     def test_change_pgv_field(self):

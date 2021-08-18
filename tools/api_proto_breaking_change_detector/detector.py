@@ -54,6 +54,9 @@ class ProtoBreakingChangeDetector(object):
         """Return True if breaking changes were detected in the given protos"""
         pass
 
+    def get_breaking_changes(self) -> List[str]:
+        pass
+
     def lock_file_changed(self) -> bool:
         """Return True if the detector state file changed after being run
 
@@ -77,7 +80,8 @@ class BufWrapper(ProtoBreakingChangeDetector):
             path_to_lock_file: str,
             path_to_changed_dir: str,
             additional_args: List[str] = None,
-            buf_path: str = None) -> None:
+            buf_path: str = None,
+            config_file_loc: str = None) -> None:
         if not Path(path_to_lock_file).is_file():
             raise ValueError(f"path_to_lock_file {path_to_lock_file} is not a file path")
 
@@ -94,35 +98,42 @@ class BufWrapper(ProtoBreakingChangeDetector):
         self._additional_args = additional_args
         self.final_lock = None
         self._buf_path = buf_path or "buf"
+        self._config_file_loc = config_file_loc
 
     def run_detector(self) -> None:
         with open(self._path_to_lock_file) as f:
             initial_lock = f.readlines()
 
-        buf_config_loc = Path(".", "tools", "api_proto_breaking_change_detector")
-
-        #copyfile(Path(buf_config_loc, "buf.lock"), Path(".", "buf.lock")) # not needed? refer to comment below
-        yaml_file_loc = Path(".", "buf.yaml")
-        copyfile(Path(buf_config_loc, "buf.yaml"), yaml_file_loc)
-
-        # TODO: figure out how to automatically pull buf deps
-        # `buf mod update` doesn't seem to do anything, and the first test will fail because it forces buf to automatically start downloading the deps
-        #        bcode, bout, berr = run_command(f"{buf_path} mod update")
-        #        bout, berr = ''.join(bout), ''.join(berr)
-
-        final_code, final_out, final_err = check_breaking(self._buf_path, self._path_to_changed_dir, self._path_to_lock_file, self._additional_args)
+        final_code, final_out, final_err = check_breaking(
+            self._buf_path, self._path_to_changed_dir, self._path_to_lock_file,
+            self._config_file_loc, self._additional_args)
+        compressed_out, compressed_err = '\n'.join(final_out), '\n'.join(final_err)
 
         new_lock_location = Path(self._path_to_changed_dir, BUF_STATE_FILE)
-        if len(final_out) == len(final_err) == final_code == 0:
-            make_lock(self._buf_path, self._path_to_changed_dir, new_lock_location, self._additional_args)
+        if len(compressed_out) == len(compressed_err) == final_code == 0:
+            make_lock(
+                self._buf_path,
+                self._path_to_changed_dir,
+                new_lock_location,
+                config_file_loc=self._config_file_loc,
+                additional_args=self._additional_args)
             with open(new_lock_location, "r") as f:
                 self.final_lock = f.readlines()
 
         self.final_result = final_code, final_out, final_err
         self.initial_lock = initial_lock
 
+    def update_lock_file(self):
+        make_lock(
+            self._buf_path,
+            self._path_to_changed_dir,
+            self._path_to_lock_file,
+            config_file_loc=self._config_file_loc,
+            additional_args=self._additional_args)
+
     def is_breaking(self) -> bool:
         final_code, final_out, final_err = self.final_result
+        final_out, final_err = '\n'.join(final_out), '\n'.join(final_err)
 
         if final_code != 0:
             return True
@@ -131,6 +142,10 @@ class BufWrapper(ProtoBreakingChangeDetector):
         if final_err != "" or "Failure" in final_err:
             return True
         return False
+
+    def get_breaking_changes(self) -> List[str]:
+        _, final_out, _ = self.final_result
+        return final_out if self.is_breaking() else []
 
     def lock_file_changed(self) -> bool:
         return self.final_lock is not None and any(
