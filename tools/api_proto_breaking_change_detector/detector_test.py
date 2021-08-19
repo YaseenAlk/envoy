@@ -136,7 +136,7 @@ class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
         copyfile(current_file, target)
         lock_location = Path(target_path, self._buf_state_file)
 
-        bazel_buf_config_loc = Path(".", "api", "buf.yaml")
+        bazel_buf_config_loc = Path(".", "external", "envoy_api_canonical", "buf.yaml")
         copyfile(bazel_buf_config_loc, self._config_file_loc)
 
         pull_buf_deps(

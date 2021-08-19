@@ -33,12 +33,3 @@ package_group(
         "//test/extensions/...",
     ],
 )
-
-# TODO: find a proper place for this build target
-filegroup(
-    name = "proto_breaking_change_detector_buf_config",
-    srcs = [
-        "api/buf.yaml",
-    ],
-    visibility = ["//visibility:public"],
-)
