@@ -31,14 +31,14 @@ class ProtoBreakingChangeDetector(object):
         This function sets up any necessary config without actually
         running the detector against any proto files.
 
-        #TODO change description
-        Takes in a single protobuf as 2 files, in a ``before`` state
-        and an ``after`` state, and checks if the ``after`` state
-        violates any breaking change rules.
+        Takes in a path to a lock file representing a proto "snapshot"
+        of the state before changes, and a path to a directory of proto
+        files that have been changed, and checks if the changes violate
+        any breaking change rules.
 
         Args:
-            path_to_lock_file {str} -- #TODO change description
-            path_to_changed_dir {str} -- #TODO change description
+            path_to_lock_file {str} -- absolute path to the lock file representing the before state
+            path_to_changed_dir {str} -- absolute path to a directory containing proto files in the after state
         """
         pass
 
@@ -56,6 +56,7 @@ class ProtoBreakingChangeDetector(object):
         pass
 
     def get_breaking_changes(self) -> List[str]:
+        """Return a list of strings containing breaking changes output by the tool"""
         pass
 
     def lock_file_changed(self) -> bool:

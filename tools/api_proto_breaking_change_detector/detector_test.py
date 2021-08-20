@@ -25,15 +25,6 @@ from typing import Tuple
 class BreakingChangeDetectorTests(object):
 
     def initialize_test(self, testname, current_file, changed_file, additional_args=None):
-        """Initializes a test case by creating a lock file
-
-        Arguments:
-            testname {str} -- name of the test case, must match testdata file name
-            current_file {str} -- absolute path to the .proto file in the "before" state
-            changed_file {str} -- absolute path to the .proto file in the "after" state
-        
-        Returns #TODO documentation?
-        """
         pass
 
     def create_detector(
