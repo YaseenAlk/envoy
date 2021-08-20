@@ -40,4 +40,3 @@ bazel.output.txt
 .coverage
 **/.DS_Store
 **/*.iml
-/api/buf.lock

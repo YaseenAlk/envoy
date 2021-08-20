@@ -158,11 +158,11 @@ class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
 
     def create_detector(self, lock_location, changed_directory, additional_args=None) -> BufWrapper:
         return BufWrapper(
-            lock_location,
             changed_directory,
             additional_args=additional_args,
             buf_path=self._buf_path,
-            config_file_loc=self._config_file_loc)
+            config_file_loc=self._config_file_loc,
+            path_to_lock_file=lock_location)
 
     @unittest.skip("PGV field support not yet added to buf")
     def test_change_pgv_field(self):

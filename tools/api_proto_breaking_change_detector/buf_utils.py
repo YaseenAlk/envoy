@@ -1,32 +1,7 @@
 from pathlib import Path
 from tools.run_command import run_command
-from detector_errors import ChangeDetectorInitializeError
+from detector_errors import ChangeDetectorError, ChangeDetectorInitializeError
 import os
-
-# TODO decide to use this or delete it
-BUF_YAML_CONTENT = """version: v1beta1
-deps:
-    - buf.build/beta/googleapis
-    - buf.build/beta/opencensus
-    - buf.build/beta/prometheus
-    - buf.build/beta/opentelemetry
-    - buf.build/beta/gogo
-    - buf.build/beta/xds
-build:
-  roots:
-    - .
-breaking:
-  ignore_unstable_packages: true
-  use:
-    - FIELD_SAME_ONEOF
-    - FIELD_SAME_JSON_NAME
-    - FIELD_SAME_NAME
-    - FIELD_SAME_TYPE
-    - FIELD_SAME_LABEL
-    - FILE_SAME_PACKAGE
-    - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED
-    - FIELD_NO_DELETE_UNLESS_NAME_RESERVED
-"""
 
 
 def _generate_buf_args(target_path, config_file_loc, additional_args):
@@ -83,9 +58,23 @@ def make_lock(buf_path, target_path, lock_file_path, config_file_loc=None, addit
 
 
 def check_breaking(
-        buf_path, target_path, lock_file_path, config_file_loc=None, additional_args=None):
+        buf_path,
+        target_path,
+        config_file_loc=None,
+        additional_args=None,
+        lock_file_path=None,
+        git_ref=None,
+        git_path=None):
+    if bool(lock_file_path) == bool(git_ref):
+        raise ChangeDetectorError(
+            "Expecting either a path to a lock file or a git ref, but not both")
+    if bool(git_ref) != bool(git_path):
+        raise ChangeDetectorError("If using git mode, expecting a git ref and a path to .git file")
+
     buf_args = _generate_buf_args(target_path, config_file_loc, additional_args)
 
+    initial_state_input = lock_file_path if lock_file_path else f'{git_path}#ref={git_ref},subdir=api'
+
     final_code, final_out, final_err = run_command(
-        ' '.join([buf_path, f"breaking --against {lock_file_path}", *buf_args]))
+        ' '.join([buf_path, f"breaking --against {initial_state_input}", *buf_args]))
     return final_code, final_out, final_err
